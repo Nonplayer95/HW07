@@ -1,67 +1,83 @@
+// MyPawn.h
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
-#include "Components/CapsuleComponent.h"
-#include "Components/SkeletalMeshComponent.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Camera/CameraComponent.h"
-#include "Components/InputComponent.h"
-#include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "MyPawn.generated.h"
+
+class UCapsuleComponent;
+class USkeletalMeshComponent;
+class USpringArmComponent;
+class UCameraComponent;
+class UInputMappingContext;
+class UInputAction;
+class UInputComponent;
 
 UCLASS()
 class TASKS_API AMyPawn : public APawn
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	
-	AMyPawn();
+    AMyPawn();
 
 protected:
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
+    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	UPROPERTY(VisibleAnywhere,BlueprintReadonly,Category="Components")
-	class UCapsuleComponent* CapsuleComponent;
+public:
+    virtual void Tick(float DeltaTime) override;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "Components")
-	class USkeletalMeshComponent* SkeletalMeshComponent;
+protected:
+    // Components
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    UCapsuleComponent* CapsuleComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "Components")
-	class USpringArmComponent* SpringArmComponent;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    USkeletalMeshComponent* SkeletalMeshComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category = "Components")
-	class UCameraComponent* CameraComponent;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    USpringArmComponent* SpringArmComponent;
 
-	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Input")
-	class UInputMappingContext* DefaultMappingContext;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    UCameraComponent* CameraComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	class UInputAction* MoveAction;
+    // Enhanced Input
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    UInputMappingContext* DefaultMappingContext;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	class UInputAction* LookAction;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    UInputAction* MoveAction;
 
-	void Move(const FInputActionValue& Value);
-	void Look(const FInputActionValue& Value);
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    UInputAction* LookAction;
 
-	float MovementSpeed = 500.0f;
-	float LookSensitivity = 1.0f;
+    // Movement Properties
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement")
+    float MoveSpeed = 500.0f;
 
-	float CurrentYaw = 0.0f;
-	float CurrentPitch = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement")
+    float TurnRate = 50.0f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement")
+    float LookUpRate = 50.0f;
 
-public:	
-	
-	virtual void Tick(float DeltaTime) override;
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+private:
+    // Input Functions
+    void Move(const FInputActionValue& Value);
+    void Look(const FInputActionValue& Value);
 
-	//// 테스트용 함수
-	//UFUNCTION(BlueprintCallable)
-	//void TestMovement();
+    // Current rotation values
+    float CurrentYaw = 0.0f;
+    float CurrentPitch = 0.0f;
 
+    // Velocity tracking
+    FVector CurrentVelocity;
+    FVector LastLocation;
+
+public:
+    // Getter for velocity
+    virtual FVector GetVelocity() const override { return CurrentVelocity; }
 };

@@ -1,144 +1,144 @@
+// MyPawn.cpp
+
 #include "MyPawn.h"
-#include "Engine/Engine.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "Camera/CameraComponent.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
+#include "Engine/LocalPlayer.h"
 
 AMyPawn::AMyPawn()
 {
-	PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bCanEverTick = true;
 
-	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent"));
-	RootComponent = CapsuleComponent;
+    // Create and setup Capsule Component as root
+    CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent"));
+    RootComponent = CapsuleComponent;
+    CapsuleComponent->InitCapsuleSize(42.0f, 96.0f);
+    CapsuleComponent->SetRelativeLocation(FVector(0.0f, 0.0f, 96.0f)); // Half height to place on ground
 
-	CapsuleComponent->SetCapsuleHalfHeight(88.0f);
-	CapsuleComponent->SetCapsuleRadius(34.0f);
-	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	CapsuleComponent->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Block);
+    // IMPORTANT: Disable physics simulation for root component
+    CapsuleComponent->SetSimulatePhysics(false);
+    CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    CapsuleComponent->SetCollisionResponseToAllChannels(ECR_Block);
 
-	// Physics Simulation 비활성화하기
-	CapsuleComponent->SetSimulatePhysics(false);
+    // Create and setup Skeletal Mesh Component
+    SkeletalMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMeshComponent"));
+    SkeletalMeshComponent->SetupAttachment(RootComponent);
+    SkeletalMeshComponent->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));
+    SkeletalMeshComponent->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
 
-	SkeletalMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMeshComponent"));
-	SkeletalMeshComponent->SetupAttachment(CapsuleComponent);
+    // IMPORTANT: Disable physics simulation for mesh component
+    SkeletalMeshComponent->SetSimulatePhysics(false);
+    SkeletalMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	SkeletalMeshComponent->SetRelativeLocation(FVector(0.0f, 0.0f, -88.0f));
-	SkeletalMeshComponent->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
-	
-	SkeletalMeshComponent->SetSimulatePhysics(false);
-	SkeletalMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    // Create and setup Spring Arm Component
+    SpringArmComponent = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComponent"));
+    SpringArmComponent->SetupAttachment(RootComponent);
+    SpringArmComponent->SetRelativeLocation(FVector(0.0f, 0.0f, 40.0f));
+    SpringArmComponent->TargetArmLength = 400.0f;
+    SpringArmComponent->bUsePawnControlRotation = false; // We'll control rotation manually
+    SpringArmComponent->bInheritPitch = true;
+    SpringArmComponent->bInheritYaw = true;
+    SpringArmComponent->bInheritRoll = true;
 
-	SpringArmComponent = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComponent"));
-	SpringArmComponent->SetupAttachment(CapsuleComponent);
+    // Create and setup Camera Component
+    CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComponent"));
+    CameraComponent->SetupAttachment(SpringArmComponent, USpringArmComponent::SocketName);
+    CameraComponent->bUsePawnControlRotation = false;
 
-	SpringArmComponent->TargetArmLength = 400.0f;
-	SpringArmComponent->bUsePawnControlRotation = false;
-	SpringArmComponent->bInheritPitch = false;
-	SpringArmComponent->bInheritYaw = false;
-	SpringArmComponent->bInheritRoll = false;
-
-	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComponent"));
-	CameraComponent->SetupAttachment(SpringArmComponent);
-
-	CurrentYaw = 0.0f;
-	CurrentPitch = 0.0f;
-
+    // Set this pawn to be controlled by the lowest-numbered player
+    AutoPossessPlayer = EAutoReceiveInput::Player0;
 }
 
 void AMyPawn::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
 
-	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
-	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
-		{
-			if (DefaultMappingContext)
-			{
-				Subsystem->AddMappingContext(DefaultMappingContext, 0);
-			}
-		}
-	}
-	
+    // Add Input Mapping Context
+    if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
+    {
+        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+        {
+            Subsystem->AddMappingContext(DefaultMappingContext, 0);
+        }
+    }
+
+    // Initialize current rotation
+    CurrentYaw = GetActorRotation().Yaw;
+    CurrentPitch = SpringArmComponent->GetRelativeRotation().Pitch;
+
+    // Initialize velocity tracking
+    LastLocation = GetActorLocation();
 }
 
 void AMyPawn::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+    Super::Tick(DeltaTime);
 
-	//// 임시 테스트: T키를 누르면 앞으로 이동
-	//if (GetWorld()->GetFirstPlayerController()->IsInputKeyDown(EKeys::T))
-	//{
-	//	TestMovement();
-	//}
-
+    // Calculate velocity
+    FVector CurrentLocation = GetActorLocation();
+    CurrentVelocity = (CurrentLocation - LastLocation) / DeltaTime;
+    LastLocation = CurrentLocation;
 }
 
 void AMyPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
-	{
-		if (MoveAction)
-		{
-			EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMyPawn::Move);
-		}
-
-		if (LookAction)
-		{
-			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AMyPawn::Look);
-		}
-	}
+    // Make sure that we are using a UEnhancedInputComponent
+    if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        // Bind the actions
+        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMyPawn::Move);
+        EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AMyPawn::Look);
+    }
 }
 
 void AMyPawn::Move(const FInputActionValue& Value)
 {
-	//Vector2D 입력값 가져오기 (X-좌우, Y-앞뒤)
-	FVector2D MovementVector = Value.Get < FVector2D>();
-	// 디버깅 로그 추가
-	UE_LOG(LogTemp, Warning, TEXT("Move Input: X=%f, Y=%f"), MovementVector.X, MovementVector.Y);
+    // Get the input as a Vector2D
+    FVector2D MovementVector = Value.Get<FVector2D>();
 
-	if (Controller != nullptr)
-	{
-		const FVector ForwardDirection = GetActorForwardVector();
-		const FVector RightDirection = GetActorRightVector();
+    if (Controller != nullptr)
+    {
+        // Get forward and right vectors based on the pawn's rotation
+        const FRotator Rotation = GetActorRotation();
+        const FRotator YawRotation(0, Rotation.Yaw, 0);
 
-		FVector MovementDirection = (ForwardDirection * MovementVector.Y) + (RightDirection * MovementVector.X);
+        // Get forward and right directions
+        const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+        const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		MovementDirection.Z = 0.0f;
-		MovementDirection.Normalize();
+        // Calculate movement
+        FVector MovementDelta = (ForwardDirection * MovementVector.Y + RightDirection * MovementVector.X) * MoveSpeed * GetWorld()->GetDeltaSeconds();
 
-		AddActorLocalOffset(MovementDirection * MovementSpeed * GetWorld()->GetDeltaSeconds(), true);
-
-
-	}
+        // Apply movement using AddActorWorldOffset
+        AddActorWorldOffset(MovementDelta, true);
+    }
 }
 
 void AMyPawn::Look(const FInputActionValue& Value)
 {
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
+    // Get the input as a Vector2D
+    FVector2D LookAxisVector = Value.Get<FVector2D>();
 
-	if (Controller != nullptr)
-	{
-		CurrentYaw += LookAxisVector.X * LookSensitivity;
-		CurrentPitch += LookAxisVector.Y * LookSensitivity;
+    if (Controller != nullptr)
+    {
+        // Calculate new rotation values
+        CurrentYaw += LookAxisVector.X * TurnRate * GetWorld()->GetDeltaSeconds();
+        CurrentPitch += LookAxisVector.Y * LookUpRate * GetWorld()->GetDeltaSeconds();
 
-		CurrentPitch = FMath::Clamp(CurrentPitch, -90.0f, 90.0f);
+        // Clamp pitch to prevent over-rotation
+        CurrentPitch = FMath::Clamp(CurrentPitch, -80.0f, 80.0f);
 
-		FRotator NewRotation = FRotator(0.0f, CurrentYaw, 0.0f);
-		SetActorRotation(NewRotation);
-		
-		if (SpringArmComponent)
-		{
-			FRotator SpringArmRotation = FRotator(CurrentPitch, CurrentYaw, 0.0f);
-			SpringArmComponent->SetWorldRotation(SpringArmRotation);
+        // Apply Yaw rotation to the entire pawn
+        SetActorRotation(FRotator(0.0f, CurrentYaw, 0.0f));
 
-		}
-	}
+        // Apply Pitch rotation to the spring arm
+        SpringArmComponent->SetRelativeRotation(FRotator(CurrentPitch, 0.0f, 0.0f));
+    }
 }
-
-//void AMyPawn::TestMovement()
-//{
-//	// 간단한 앞으로 이동 테스트
-//	FVector ForwardDirection = GetActorForwardVector();
-//	AddActorWorldOffset(ForwardDirection * 100.0f);
-//	UE_LOG(LogTemp, Warning, TEXT("Test Movement Called!"));
-//}
